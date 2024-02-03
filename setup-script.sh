@@ -36,7 +36,7 @@ add_nfs_entries() {
 apt update && apt upgrade -y || handle_error "Failed to update and upgrade."
 
 # List of packages to install
-packages_to_install=("xfce4" "xrdp" "pulseaudio" "vlc" "curl" "firefox-esr")
+packages_to_install=("xfce4" "xrdp" "pulseaudio" "vlc" "curl" "firefox-esr" "nfs-common")
 
 # Install specified packages
 install_packages "${packages_to_install[@]}"
