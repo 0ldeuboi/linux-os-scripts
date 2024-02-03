@@ -36,7 +36,7 @@ add_nfs_entries() {
 apt update && apt upgrade -y || handle_error "Failed to update and upgrade."
 
 # List of packages to install
-packages_to_install=("xfce4" "xrdp" "pulseaudio" "vlc" "curl" "firefox-esr" "nfs-common")
+packages_to_install=("xfce4" "xrdp" "xfce4-goodies" "xorg" "dbus-x1" "x11-xserver-utils" "pulseaudio" "vlc" "curl" "firefox-esr" "nfs-common" "alsa-utils")
 
 # Install specified packages
 install_packages "${packages_to_install[@]}"
@@ -48,11 +48,11 @@ systemctl restart xrdp
 # Enable xrdp to start at boot
 systemctl enable xrdp
 
+# once RDP is installed we need to add this code, so that desktop manager know what to use for display:
+update-alternatives --set x-session-manager /usr/bin/xfce4-session
+
 # Create user 'james'
 adduser james
-
-# Prompt for user 'james' password
-passwd james
 
 # Install sudoers
 install_packages sudo
@@ -63,10 +63,6 @@ adduser james sudo
 # Add system-wide aliases
 echo "alias ll='ls -la'" >> /etc/bash.bashrc
 echo "alias uur='apt update && apt full-upgrade -y && apt autoremove -y'" >> /etc/bash.bashrc
-
-# Update package list and install Firefox
-sudo apt-get update
-sudo apt-get install firefox
 
 # NFS Configuration
 add_nfs_entries WORKING 192.168.1.167 /mnt/WORKING
