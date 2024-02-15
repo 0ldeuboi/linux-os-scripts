@@ -1,5 +1,14 @@
 #!/bin/sh
 
+#######################################################################################
+#                 Script for updating packages on Alpine Linux                        #
+#                                                                                     #
+#  path to script:  /etc/periodic/daily/update_packages.sh                            #
+#  cronjob:         @daily @02:00                                                     #
+#  path to log:     /var/log/update_packages.log                                      #
+#                                                                                     #
+#######################################################################################
+
 # Set log file path
 readonly LOG_FILE="/var/log/update_packages.log"
 
