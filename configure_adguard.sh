@@ -116,6 +116,12 @@ configure_iptables() {
         rule_exists INPUT -p tcp --dport 53 -s $range -j ACCEPT || iptables -A INPUT -p tcp -s $range --dport 53 -j ACCEPT
     done
 
+    # Allow DNS traffic from specific IP addresses
+    for ip in "90.251.254.22" "89.37.94.113"; do
+        rule_exists INPUT -p udp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p udp --dport 53 -s $ip -j ACCEPT
+        rule_exists INPUT -p tcp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p tcp -s $ip --dport 53 -j ACCEPT
+    done
+
     # Allow traffic to and from the Wi-Fi access point
     rule_exists INPUT -s $WIFI_AP_IP -j ACCEPT || iptables -A INPUT -s $WIFI_AP_IP -j ACCEPT
     rule_exists OUTPUT -d $WIFI_AP_IP -j ACCEPT || iptables -A OUTPUT -d $WIFI_AP_IP -j ACCEPT
@@ -137,6 +143,11 @@ configure_ufw() {
     for range in "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"; do
         ufw status | grep -q "ALLOW IN $range to any port 53" || ufw allow from $range to any port 53
         ufw status | grep -q "ALLOW IN $range" || ufw allow from $range
+    done
+
+    # Allow DNS traffic from specific IP addresses
+    for ip in "90.251.254.22" "89.37.94.113"; do
+        ufw status | grep -q "ALLOW IN $ip to any port 53" || ufw allow from $ip to any port 53
     done
 
     # Allow traffic to and from the Wi-Fi access point
