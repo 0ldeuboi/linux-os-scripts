@@ -4,12 +4,14 @@
 # configure_adguard.sh
 SERVER_IP="192.168.1.183"
 REVERSE_PROXY_IP="192.168.1.190"
-CLOUDFLARE_TUNNEL_IP="192.168.1.252"
+CLOUDFLARE_TUNNEL_IP="192.168.1.249"
 WIFI_AP_IP="192.168.1.3"
 ADGUARD_CONFIG="/opt/AdGuardHome/AdGuardHome.yaml"
 CLOUDFLARE_IPS_V4_URL="https://www.cloudflare.com/ips-v4"
 CLOUDFLARE_IPS_V6_URL="https://www.cloudflare.com/ips-v6"
 TEMP_DNS_SERVER="1.1.1.1"
+DOMAIN="adguard.myhomenet.casa"
+SPECIFIC_IPS=("89.37.94.113" "90.251.254.22")
 
 # Cloudflare Tunnel IPs and Domains
 TUNNEL_IPS_V4=("198.41.192.167" "198.41.192.67" "198.41.192.57" "198.41.192.107" "198.41.192.27" "198.41.192.7" "198.41.192.227" "198.41.192.47" "198.41.192.37" "198.41.192.77" "198.41.200.13" "198.41.200.193" "198.41.200.3" "198.41.200.233" "198.41.200.53" "198.41.200.63" "198.41.200.113" "198.41.200.73" "198.41.200.43" "198.41.200.23")
@@ -72,7 +74,7 @@ install_packages() {
 # Function to update AdGuard configuration
 update_adguard_config() {
     log "Updating AdGuard Home configuration..."
-    backup_file="${ADGUARD_CONFIG}.bak.$(date)"
+    backup_file="${ADGUARD_CONFIG}.bak.$(date +'%Y%m%d%H%M%S')"
     cp $ADGUARD_CONFIG $backup_file
     log "Backup of AdGuard Home configuration created at $backup_file"
 
@@ -106,6 +108,16 @@ restart_adguard() {
     fi
 }
 
+# Resolve the IP addresses of the domain
+resolve_domain_ips() {
+    DOMAIN_IPS=$(dig +short $DOMAIN | tr '\n' ' ')
+    if [[ -z "$DOMAIN_IPS" ]]; then
+        log "Could not resolve IPs for domain $DOMAIN"
+        exit 1
+    fi
+    log "Resolved IPs for $DOMAIN are $DOMAIN_IPS"
+}
+
 # Function to configure iptables
 configure_iptables() {
     log "Configuring iptables..."
@@ -117,7 +129,7 @@ configure_iptables() {
     done
 
     # Allow DNS traffic from specific IP addresses
-    for ip in "90.251.254.22" "89.37.94.113"; do
+    for ip in "${SPECIFIC_IPS[@]}"; do
         rule_exists INPUT -p udp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p udp --dport 53 -s $ip -j ACCEPT
         rule_exists INPUT -p tcp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p tcp -s $ip --dport 53 -j ACCEPT
     done
@@ -125,6 +137,11 @@ configure_iptables() {
     # Allow traffic to and from the Wi-Fi access point
     rule_exists INPUT -s $WIFI_AP_IP -j ACCEPT || iptables -A INPUT -s $WIFI_AP_IP -j ACCEPT
     rule_exists OUTPUT -d $WIFI_AP_IP -j ACCEPT || iptables -A OUTPUT -d $WIFI_AP_IP -j ACCEPT
+
+    # Allow HTTPS traffic from specific IP addresses and resolved domain IPs
+    for ip in "${SPECIFIC_IPS[@]}" $DOMAIN_IPS; do
+        rule_exists INPUT -p tcp --dport 443 -s $ip -j ACCEPT || iptables -A INPUT -p tcp --dport 443 -s $ip -j ACCEPT
+    done
 
     # Block all other DNS traffic
     rule_exists INPUT -p udp --dport 53 -s 0.0.0.0/0 -j DROP || iptables -A INPUT -p udp --dport 53 -s 0.0.0.0/0 -j DROP
@@ -146,7 +163,7 @@ configure_ufw() {
     done
 
     # Allow DNS traffic from specific IP addresses
-    for ip in "90.251.254.22" "89.37.94.113"; do
+    for ip in "${SPECIFIC_IPS[@]}"; do
         ufw status | grep -q "ALLOW IN $ip to any port 53" || ufw allow from $ip to any port 53
     done
 
@@ -204,6 +221,11 @@ configure_ufw() {
         ufw status | grep -q "ALLOW IN $ip to any port 443" || ufw allow proto tcp from $ip to any port 443
     done
 
+    # Allow HTTPS traffic from specific IP addresses and resolved domain IPs
+    for ip in "${SPECIFIC_IPS[@]}" $DOMAIN_IPS; do
+        ufw status | grep -q "ALLOW IN $ip to any port 443" || ufw allow proto tcp from $ip to any port 443
+    done
+
     execute_command "ufw reload"
     execute_command "ufw enable"
     log "ufw configured and enabled."
@@ -225,9 +247,11 @@ main() {
     allow_dns_traffic
     install_packages
     reapply_dns_restrictions
+    resolve_domain_ips
+    configure_iptables
+    configure_ufw
     update_adguard_config
     restart_adguard
-    configure_ufw
     restore_original_dns
     log "Configuration complete. Your AdGuard Home server should now only respond to DNS queries from local networks, allow SSH, and HTTPS traffic from Cloudflare IPs, your reverse proxy, and your Cloudflare Tunnel server. Cloudflare Tunnel configuration has also been applied."
 }
