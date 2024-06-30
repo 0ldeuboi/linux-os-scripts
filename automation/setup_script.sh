@@ -12,8 +12,8 @@ GITHUB_REPO_URL="https://raw.githubusercontent.com/0ldeuboi/linux-os-scripts/mai
 
 # Function to print colored messages and log them
 print_colored() {
-    color=$1
-    message=$2
+    local color=$1
+    local message=$2
     echo -e "${color}${message}${NC}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ${message}" >>"$LOG_FILE"
 }
@@ -66,24 +66,11 @@ if ! $PACKAGE_CHECK | grep -q dialog; then
     $INSTALL_CMD dialog
 fi
 
-# Source functions from GitHub
-source <(curl -s "$GITHUB_REPO_URL/update_upgrade.sh")
-source <(curl -s "$GITHUB_REPO_URL/add_aliases.sh")
-source <(curl -s "$GITHUB_REPO_URL/install_packages.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_user.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_ufw.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_fail2ban.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_auto_updates.sh")
-source <(curl -s "$GITHUB_REPO_URL/optimize_ssh.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_nfs.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_update_script.sh")
-source <(curl -s "$GITHUB_REPO_URL/install_dnscrypt.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_dns.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_dns_setup.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_cron_dns.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_vpn_check.sh")
-source <(curl -s "$GITHUB_REPO_URL/create_vpn_service.sh")
-source <(curl -s "$GITHUB_REPO_URL/configure_log_rotation.sh")
+# Function to source scripts from GitHub when needed
+source_script() {
+    local script_url="$1"
+    source <(curl -s -H "Authorization: token $GITHUB_TOKEN" "$script_url") || handle_error "Failed to source $script_url"
+}
 
 # Define the options for the checklist
 cmd=(dialog --separate-output --checklist "Select options:" 22 76 16)
@@ -115,23 +102,23 @@ clear
 run_actions() {
     local choice=$1
     case $choice in
-    1 | 18) update_upgrade ;;
-    2 | 18) add_aliases ;;
-    3 | 18) install_packages ;;
-    4 | 18) create_user ;;
-    5 | 18) configure_ufw ;;
-    6 | 18) configure_fail2ban ;;
-    7 | 18) configure_auto_updates ;;
-    8 | 18) optimize_ssh ;;
-    9 | 18) configure_nfs ;;
-    10 | 18) create_update_script ;;
-    11 | 18) install_dnscrypt ;;
-    12 | 18) configure_dns ;;
-    13 | 18) create_dns_setup ;;
-    14 | 18) create_cron_dns ;;
-    15 | 18) create_vpn_check ;;
-    16 | 18) create_vpn_service ;;
-    17 | 18) configure_log_rotation ;;
+    1 | 18) source_script "$GITHUB_REPO_URL/update_upgrade.sh" && update_upgrade ;;
+    2 | 18) source_script "$GITHUB_REPO_URL/add_aliases.sh" && add_aliases ;;
+    3 | 18) source_script "$GITHUB_REPO_URL/install_packages.sh" && install_packages ;;
+    4 | 18) source_script "$GITHUB_REPO_URL/create_user.sh" && create_user ;;
+    5 | 18) source_script "$GITHUB_REPO_URL/configure_ufw.sh" && configure_ufw ;;
+    6 | 18) source_script "$GITHUB_REPO_URL/configure_fail2ban.sh" && configure_fail2ban ;;
+    7 | 18) source_script "$GITHUB_REPO_URL/configure_auto_updates.sh" && configure_auto_updates ;;
+    8 | 18) source_script "$GITHUB_REPO_URL/optimize_ssh.sh" && optimize_ssh ;;
+    9 | 18) source_script "$GITHUB_REPO_URL/configure_nfs.sh" && configure_nfs ;;
+    10 | 18) source_script "$GITHUB_REPO_URL/create_update_script.sh" && create_update_script ;;
+    11 | 18) source_script "$GITHUB_REPO_URL/install_dnscrypt.sh" && install_dnscrypt ;;
+    12 | 18) source_script "$GITHUB_REPO_URL/configure_dns.sh" && configure_dns ;;
+    13 | 18) source_script "$GITHUB_REPO_URL/create_dns_setup.sh" && create_dns_setup ;;
+    14 | 18) source_script "$GITHUB_REPO_URL/create_cron_dns.sh" && create_cron_dns ;;
+    15 | 18) source_script "$GITHUB_REPO_URL/create_vpn_check.sh" && create_vpn_check ;;
+    16 | 18) source_script "$GITHUB_REPO_URL/create_vpn_service.sh" && create_vpn_service ;;
+    17 | 18) source_script "$GITHUB_REPO_URL/configure_log_rotation.sh" && configure_log_rotation ;;
     *)
         print_colored $RED "Invalid choice. Exiting."
         exit 1
