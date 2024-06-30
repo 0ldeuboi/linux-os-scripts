@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 LOG_FILE="/var/log/setup_script.log"
-GITHUB_REPO_URL="https://raw.githubusercontent.com/yourusername/yourrepo/main"
+GITHUB_REPO_URL="https://raw.githubusercontent.com/0ldeuboi/linux-os-scripts/main/automation/"
 
 # Function to print colored messages and log them
 print_colored() {
