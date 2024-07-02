@@ -142,7 +142,7 @@ color
 catch_errors
 
 # Check system requirements
-shell_check
+#shell_check
 root_check
 arch_check
 detect_package_manager
