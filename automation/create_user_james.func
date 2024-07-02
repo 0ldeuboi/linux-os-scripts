@@ -1,0 +1,43 @@
+create_user_james() {
+    local username="james"
+
+    if id "$username" &>/dev/null; then
+        print_colored $YELLOW "User '$username' already exists. Skipping creation."
+    else
+        print_colored $BLUE "Creating user '$username'..."
+        
+        if ! adduser -m -s /bin/bash "$username"; then
+            handle_error "Failed to create user $username"
+        fi
+
+        read -sp "Enter password for user '$username': " user_password
+        echo
+        if ! echo "$username:$user_password" | chpasswd; then
+            handle_error "Failed to set password for $username"
+        fi
+
+        if command -v usermod &>/dev/null; then
+            if ! usermod -aG sudo "$username"; then
+                handle_error "Failed to add $username to sudo group"
+            fi
+        elif command -v addgroup &>/dev/null; then
+            if ! addgroup "$username" wheel; then
+                handle_error "Failed to add $username to wheel group"
+            fi
+        fi
+
+        read -p "Enter the SSH public key for the user '$username': " ssh_key
+        if [ -z "$ssh_key" ]; then
+            handle_error "SSH public key is required."
+        fi
+
+        local ssh_dir="/home/$username/.ssh"
+        mkdir -p "$ssh_dir" || handle_error "Failed to create .ssh directory for $username"
+        echo "$ssh_key" > "$ssh_dir/authorized_keys" || handle_error "Failed to write SSH public key"
+        chown -R "$username:$username" "$ssh_dir" || handle_error "Failed to set permissions on $ssh_dir"
+        chmod 700 "$ssh_dir" || handle_error "Failed to set permissions on $ssh_dir"
+        chmod 600 "$ssh_dir/authorized_keys" || handle_error "Failed to set permissions on $ssh_dir/authorized_keys"
+    fi
+
+    print_colored $GREEN "User '$username' creation and configuration completed."
+}

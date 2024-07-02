@@ -1,0 +1,82 @@
+install_packages_dialog() {
+    cmd=(dialog --separate-output --checklist "Select packages to install:" 22 76 20)
+    options=(
+        1 "curl: Command line tool for transferring data with URLs" off
+        2 "nfs-common / nfs-utils: Support for Network File System (NFS)" off
+        3 "alsa-utils: Advanced Linux Sound Architecture utilities" off
+        4 "wget: Network downloader for files from the web" off
+        5 "sudo: Allows a permitted user to execute a command as the superuser or another user" off
+        6 "grep: Command line utility for searching plain-text data" off
+        7 "git: Distributed version control system" off
+        8 "ufw: Uncomplicated Firewall, a frontend for iptables" off
+        9 "htop: Interactive process viewer for Unix systems" off
+        10 "net-tools: Networking tools like ifconfig, netstat, etc." off
+        11 "vim: Highly configurable text editor" off
+        12 "fail2ban: Intrusion prevention software framework" off
+        13 "tmux: Terminal multiplexer" off
+        14 "zip: Compression utility" off
+        15 "unzip: Extraction utility for .zip files" off
+        16 "build-essential / build-base: Compiler and libraries for building software" off
+        17 "software-properties-common: Manage software repositories and PPAs" off
+        18 "rsync: Fast, versatile file copying tool" off
+        19 "docker: Platform to develop, ship, and run applications in containers" off
+        20 "docker-compose: Define and run multi-container Docker applications" off
+        21 "python3: High-level programming language interpreter" off
+        22 "python3-pip: Package installer for Python" off
+        23 "nodejs: JavaScript runtime built on Chrome's V8 engine" off
+        24 "npm: Node.js package manager" off
+        25 "nginx: High-performance HTTP server and reverse proxy" off
+        26 "apache2: Web server software" off
+        27 "mysql-server: Relational database management system" off
+        28 "postgresql: Advanced, open-source relational database" off
+        29 "redis: In-memory data structure store, used as a database, cache, and message broker" off
+        30 "mongodb: NoSQL database with a flexible, JSON-like document model" off
+    )
+
+    choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
+
+    declare -A package_map
+    package_map=(
+        [1]="curl"
+        [2]="nfs-common nfs-utils"
+        [3]="alsa-utils"
+        [4]="wget"
+        [5]="sudo"
+        [6]="grep"
+        [7]="git"
+        [8]="ufw"
+        [9]="htop"
+        [10]="net-tools"
+        [11]="vim"
+        [12]="fail2ban"
+        [13]="tmux"
+        [14]="zip"
+        [15]="unzip"
+        [16]="build-essential build-base"
+        [17]="software-properties-common"
+        [18]="rsync"
+        [19]="docker.io docker"
+        [20]="docker-compose"
+        [21]="python3"
+        [22]="python3-pip"
+        [23]="nodejs"
+        [24]="npm"
+        [25]="nginx"
+        [26]="apache2"
+        [27]="mysql-server"
+        [28]="postgresql"
+        [29]="redis"
+        [30]="mongodb"
+    )
+
+    echo "Installing selected packages..."
+
+    for choice in $choices; do
+        packages=${package_map[$choice]}
+        for package in $packages; do
+            install_package "$package"
+        done
+    done
+
+    echo "Selected packages installation completed."
+}

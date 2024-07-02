@@ -2,13 +2,13 @@
 
 # Function to set color variables using ANSI escape codes for formatting text in the terminal.
 color() {
-    YW=$(echo "\033[33m")
-    BL=$(echo "\033[36m")
-    RD=$(echo "\033[01;31m")
-    BGN=$(echo "\033[4;92m")
-    GN=$(echo "\033[1;92m")
-    DGN=$(echo "\033[32m")
-    CL=$(echo "\033[m")
+    YW="\033[33m"
+    BL="\033[36m"
+    RD="\033[01;31m"
+    BGN="\033[4;92m"
+    GN="\033[1;92m"
+    DGN="\033[32m"
+    CL="\033[m"
     CM="${GN}✓${CL}"
     CROSS="${RD}✗${CL}"
     BFR="\\r\\033[K"
@@ -100,11 +100,40 @@ root_check() {
 # Function to check system architecture.
 arch_check() {
     if [ "$(dpkg --print-architecture)" != "amd64" ]; then
-        echo -e "\n ${CROSS} This script will not work with PiMox! \n"
-        echo -e "\n Visit https://github.com/asylumexp/Proxmox for ARM64 support. \n"
+        echo -e "\n ${CROSS} This script will only work on amd64! \n"
         echo -e "Exiting..."
         sleep 2
         exit 1
+    fi
+}
+
+# Utility function to detect package manager and set commands.
+detect_package_manager() {
+    if command -v apt-get &>/dev/null; then
+        PACKAGE_MANAGER="apt-get"
+        INSTALL_CMD="apt-get install -y"
+        UPDATE_CMD="apt-get update -y"
+        PACKAGE_CHECK="dpkg -l"
+    elif command -v apk &>/dev/null; then
+        PACKAGE_MANAGER="apk"
+        INSTALL_CMD="apk add --no-cache"
+        UPDATE_CMD="apk update"
+        PACKAGE_CHECK="apk list --installed"
+    else
+        msg_error "Unsupported package manager. Please install the required packages manually."
+        exit_script
+    fi
+}
+
+# Utility function to install packages.
+install_package() {
+    local package=$1
+    if ! $PACKAGE_CHECK | grep -q "$package"; then
+        msg_info "Installing $package..."
+        $INSTALL_CMD $package || handle_error "Failed to install $package"
+        msg_ok "$package installed successfully."
+    else
+        msg_ok "$package is already installed."
     fi
 }
 
@@ -116,6 +145,7 @@ catch_errors
 shell_check
 root_check
 arch_check
+detect_package_manager
 
 # Define log file and other variables
 LOG_FILE="/var/log/setup_script.log"
@@ -146,31 +176,8 @@ handle_error() {
     esac
 }
 
-# Detect package manager and system type
-if command -v apt-get &>/dev/null; then
-    PACKAGE_MANAGER="apt-get"
-    INSTALL_CMD="apt-get install -y"
-    UPDATE_CMD="apt-get update -y"
-    PACKAGE_CHECK="dpkg -l"
-    PACKAGE_LIST="curl nfs-common alsa-utils wget sudo grep git ufw htop net-tools vim fail2ban tmux zip unzip build-essential software-properties-common rsync"
-elif command -v apk &>/dev/null; then
-    PACKAGE_MANAGER="apk"
-    INSTALL_CMD="apk add --no-cache"
-    UPDATE_CMD="apk update"
-    PACKAGE_CHECK="apk list --installed"
-    PACKAGE_LIST="curl nfs-utils alsa-utils wget sudo grep git ufw htop vim fail2ban tmux zip unzip build-base"
-else
-    msg_error "Unsupported package manager. Please install the required packages manually."
-    exit_script
-fi
-
 # Install dialog if not installed
-if ! $PACKAGE_CHECK | grep -q dialog; then
-    msg_info "Installing dialog package..."
-    $UPDATE_CMD
-    $INSTALL_CMD dialog
-    msg_ok "Dialog installed successfully."
-fi
+install_package "dialog"
 
 # Function to source scripts from GitHub when needed
 source_script() {
@@ -179,26 +186,17 @@ source_script() {
 }
 
 # Define the options for the checklist
-cmd=(dialog --separate-output --checklist "Select options:" 22 76 16)
+cmd=(dialog --separate-output --checklist "Select options:" 22 76 12)
 options=(
-    1 "Update and Upgrade System" off
-    2 "Add System-wide Aliases" off
-    3 "Install Necessary Packages" off
-    4 "Create User 'james'" off
-    5 "Configure UFW" off
-    6 "Configure Fail2Ban" off
-    7 "Configure Automatic Security Updates" off
-    8 "Optimize SSH Configuration" off
-    9 "Configure NFS" off
-    10 "Create Daily Package Update Script" off
-    11 "Install and Configure DNSCrypt-Proxy" off
-    12 "Configure Custom DNS" off
-    13 "Create DNS Setup Script" off
-    14 "Create Cron Job for DNS Setup" off
-    15 "Create VPN Check Script" off
-    16 "Create Systemd Service for VPN Check" off
-    17 "Configure Log Rotation" off
-    18 "Run All Actions" off
+    1 "Add System-wide Aliases" off
+    2 "Install Necessary Packages" off
+    3 "User and Security Configuration" off
+    4 "Configure UFW and Fail2Ban" off
+    5 "Configure NFS" off
+    6 "DNS and Network Configuration" off
+    7 "Create Automatic Security Updates & Daily Package Updates" off
+    8 "Configure VPN and Log Rotation" off
+    9 "Run All Actions" off
 )
 
 choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
@@ -208,32 +206,49 @@ clear
 run_actions() {
     local choice=$1
     case $choice in
-    1 | 18) source_script "$GITHUB_REPO_URL/update_upgrade.func" && update_upgrade ;;
-    2 | 18) source_script "$GITHUB_REPO_URL/add_aliases.func" && add_aliases ;;
-    3 | 18) source_script "$GITHUB_REPO_URL/install_packages.func" && install_packages ;;
-    4 | 18) source_script "$GITHUB_REPO_URL/create_user.func" && create_user ;;
-    5 | 18) source_script "$GITHUB_REPO_URL/configure_ufw.func" && configure_ufw ;;
-    6 | 18) source_script "$GITHUB_REPO_URL/configure_fail2ban.func" && configure_fail2ban ;;
-    7 | 18) source_script "$GITHUB_REPO_URL/configure_auto_updates.func" && configure_auto_updates ;;
-    8 | 18) source_script "$GITHUB_REPO_URL/optimize_ssh.func" && optimize_ssh ;;
-    9 | 18) source_script "$GITHUB_REPO_URL/configure_nfs.func" && configure_nfs ;;
-    10 | 18) source_script "$GITHUB_REPO_URL/create_update_script.func" && create_update_script ;;
-    11 | 18) source_script "$GITHUB_REPO_URL/install_dnscrypt.func" && install_dnscrypt ;;
-    12 | 18) source_script "$GITHUB_REPO_URL/configure_dns.func" && configure_dns ;;
-    13 | 18) source_script "$GITHUB_REPO_URL/create_dns_setup.func" && create_dns_setup ;;
-    14 | 18) source_script "$GITHUB_REPO_URL/create_cron_dns.func" && create_cron_dns ;;
-    15 | 18) source_script "$GITHUB_REPO_URL/create_vpn_check.func" && create_vpn_check ;;
-    16 | 18) source_script "$GITHUB_REPO_URL/create_vpn_service.func" && create_vpn_service ;;
-    17 | 18) source_script "$GITHUB_REPO_URL/configure_log_rotation.func" && configure_log_rotation ;;
+    1 | 9)
+        source_script "$GITHUB_REPO_URL/add_aliases.func" && add_aliases
+        ;;
+    2 | 9)
+        source_script "$GITHUB_REPO_URL/update_upgrade.func" && update_upgrade
+        source_script "$GITHUB_REPO_URL/install_packages.func" && install_packages_dialog
+        ;;
+    3 | 9)
+        source_script "$GITHUB_REPO_URL/create_user_james.func" && create_user_james
+        source_script "$GITHUB_REPO_URL/optimise_ssh.func" && optimise_ssh
+        ;;
+    4 | 9)
+        source_script "$GITHUB_REPO_URL/configure_ufw.func" && configure_ufw
+        source_script "$GITHUB_REPO_URL/configure_fail2ban.func" && configure_fail2ban
+        ;;
+    5 | 9)
+        source_script "$GITHUB_REPO_URL/configure_nfs.func" && add_nfs_entries
+        ;;
+    6 | 9)
+        source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func" && install_dnscrypt_proxy
+        source_script "$GITHUB_REPO_URL/configure_dnscrypt_proxy.func" && configure_dnscrypt_proxy
+        source_script "$GITHUB_REPO_URL/set_custom_dns.func" && set_custom_dns
+        source_script "$GITHUB_REPO_URL/create_dns_setup_script.func" && create_dns_setup_script
+        source_script "$GITHUB_REPO_URL/create_dns_cron_job.func" && create_dns_cron_job
+        ;;
+    7 | 9)
+        source_script "$GITHUB_REPO_URL/configure_auto_updates.func" && configure_auto_updates
+        source_script "$GITHUB_REPO_URL/create_daily_update_script.func" && create_daily_update_script
+        ;;
+    8 | 9)
+        source_script "$GITHUB_REPO_URL/create_vpn_check_script.func" && create_vpn_check_script
+        source_script "$GITHUB_REPO_URL/create_vpn_check_service.func" && create_vpn_check_service
+        source_script "$GITHUB_REPO_URL/configure_log_rotation.func" && configure_log_rotation
+        ;;
     *)
-        msg_error "Invalid choice. Exiting."
-        exit_script
+        echo "Invalid choice. Exiting."
+        exit 1
         ;;
     esac
 }
 
-if [[ " ${choices[@]} " =~ " 18 " ]]; then
-    for i in {1..17}; do
+if [[ " ${choices[@]} " =~ " 9 " ]]; then
+    for i in {1..8}; do
         run_actions $i
     done
 else
@@ -243,7 +258,7 @@ else
 fi
 
 echo ""
-msg_ok "Setup completed successfully. Install log can be found at $LOG_FILE"
+echo "Setup completed successfully. Install log can be found at $LOG_FILE"
 read -p "Would you like to view the install log now? (y/n): " view_log
 if [[ "$view_log" == "y" || "$view_log" == "Y" ]]; then
     less $LOG_FILE

@@ -1,0 +1,12 @@
+configure_auto_updates() {
+    detect_package_manager
+    if [ "$PACKAGE_MANAGER" == "apt-get" ]; then
+        install_package "unattended-upgrades"
+        dpkg-reconfigure -plow unattended-upgrades || handle_error "Failed to configure unattended-upgrades"
+        print_colored $GREEN "Automatic security updates configuration completed."
+    elif [ "$PACKAGE_MANAGER" == "apk" ]; then
+        print_colored $YELLOW "Automatic security updates are not available on Alpine Linux."
+    else
+        handle_error "Unsupported package manager."
+    fi
+}

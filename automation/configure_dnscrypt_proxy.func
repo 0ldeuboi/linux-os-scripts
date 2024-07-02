@@ -1,0 +1,21 @@
+configure_dnscrypt_proxy() {
+    print_colored $BLUE "Configuring dnscrypt-proxy..."
+
+    cat <<'EOF' > /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+server_names = ['custom-adguard-doh', 'custom-adguard-dot', 'custom-adguard-doq']
+
+[static]
+  [static.'custom-adguard-doh']
+    stamp = 'sdns://AgcAAAAAAAAAAAAPZG5zLWRvaC5leGFtcGxlLmNvbQovZG5zLXF1ZXJ5'
+  [static.'custom-adguard-dot']
+    stamp = 'sdns://AQcAAAAAAAAAD2Rucy1kb3QuZXhhbXBsZS5jb20KL2Rucy1xdWVyeQ'
+  [static.'custom-adguard-doq']
+    stamp = 'sdns://AgcAAAAAAAAAAAAPZG5zLWRvcS5leGFtcGxlLmNvbQovZG5zLXF1ZXJ5'
+
+listen_addresses = ['127.0.2.1:53']
+EOF
+
+    systemctl restart dnscrypt-proxy || handle_error "Failed to restart dnscrypt-proxy."
+
+    print_colored $GREEN "dnscrypt-proxy configuration completed."
+}

@@ -1,0 +1,16 @@
+update_upgrade() {
+    if [ -z "$PACKAGE_MANAGER" ] || [ -z "$UPDATE_CMD" ]; then
+        handle_error "Package manager not set or unsupported. Please ensure PACKAGE_MANAGER and UPDATE_CMD are defined."
+        return 1
+    fi
+
+    print_colored $BLUE "Updating and upgrading system packages with $PACKAGE_MANAGER..."
+
+    if ! eval "$UPDATE_CMD && ${PACKAGE_MANAGER} upgrade -y"; then
+        handle_error "Failed to update and upgrade."
+        return 1
+    fi
+
+    print_colored $GREEN "System update and upgrade completed."
+    return 0
+}

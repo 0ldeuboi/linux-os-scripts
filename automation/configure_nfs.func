@@ -1,0 +1,38 @@
+add_nfs_entries() {
+    local remote_ip=${1:-}
+    local mount_point=${2:-}
+
+    # Get the local IP address
+    local local_ip
+    local_ip=$(hostname -I | awk '{print $1}') || handle_error "Failed to get local IP address"
+
+    # Ensure NFS utilities are installed
+    detect_package_manager
+    install_package "nfs-common" || install_package "nfs-utils"
+
+    # Prompt for input if not provided
+    if [ -z "$remote_ip" ]; then
+        read -p "Enter remote IP: " remote_ip
+    fi
+    if [ -z "$mount_point" ]; then
+        read -p "Enter mount point: " mount_point
+    fi
+
+    # Create the mount point directory
+    print_colored $BLUE "Creating mount point: $mount_point"
+    mkdir -p "$mount_point" || handle_error "Failed to create directory: $mount_point"
+    
+    # Add the NFS entry to /etc/fstab
+    print_colored $BLUE "Adding NFS entry to /etc/fstab"
+    if ! echo "$remote_ip:/volume1/$local_ip $mount_point nfs defaults 0 0" >> /etc/fstab; then
+        handle_error "Failed to add NFS entry to /etc/fstab"
+    fi
+
+    # Mount the NFS share
+    print_colored $BLUE "Mounting NFS share"
+    if ! mount -a; then
+        handle_error "Failed to mount NFS share"
+    fi
+
+    print_colored $GREEN "NFS entry added and mounted successfully."
+}

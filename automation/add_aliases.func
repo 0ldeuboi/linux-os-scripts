@@ -1,0 +1,23 @@
+add_aliases() {
+    local aliases_file="/etc/profile.d/aliases.sh"
+
+    print_colored $BLUE "Adding system-wide aliases..."
+
+    if ! grep -q "alias ll='ls -la'" "$aliases_file"; then
+        echo "alias ll='ls -la'" >> "$aliases_file"
+    fi
+
+    if command -v apt-get &>/dev/null; then
+        if ! grep -q "alias uur='apt-get update -y && apt-get upgrade -y'" "$aliases_file"; then
+            echo "alias uur='apt-get update -y && apt-get upgrade -y'" >> "$aliases_file"
+        fi
+    elif command -v apk &>/dev/null; then
+        if ! grep -q "alias uur='apk update && apk upgrade'" "$aliases_file"; then
+            echo "alias uur='apk update && apk upgrade'" >> "$aliases_file"
+        fi
+    fi
+
+    source "$aliases_file"
+
+    print_colored $GREEN "System-wide aliases added."
+}

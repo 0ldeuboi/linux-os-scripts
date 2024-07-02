@@ -1,0 +1,17 @@
+optimise_ssh() {
+    print_colored $BLUE "Optimizing SSH configuration for security..."
+
+    if ! sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config; then
+        handle_error "Failed to update PermitRootLogin setting"
+    fi
+
+    if ! sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config; then
+        handle_error "Failed to update PasswordAuthentication setting"
+    fi
+
+    if ! systemctl restart sshd; then
+        handle_error "Failed to restart SSH service"
+    fi
+
+    print_colored $GREEN "SSH configuration optimization completed."
+}
