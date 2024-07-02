@@ -143,8 +143,8 @@ catch_errors
 
 # Check system requirements
 #shell_check
+#arch_check
 root_check
-arch_check
 detect_package_manager
 
 # Define log file and other variables
