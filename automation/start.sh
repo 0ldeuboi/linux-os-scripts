@@ -75,38 +75,6 @@ exit_script() {
     exit
 }
 
-# Function to check if the shell is using bash.
-shell_check() {
-    if [[ "$(basename "$SHELL")" != "bash" ]]; then
-        clear
-        msg_error "Your default shell is not set to Bash. Please switch to Bash to use these scripts."
-        echo -e "\nExiting..."
-        sleep 2
-        exit 1
-    fi
-}
-
-# Function to ensure the script is run as root.
-root_check() {
-    if [[ "$(id -u)" -ne 0 ]]; then
-        clear
-        msg_error "Please run this script as root."
-        echo -e "\nExiting..."
-        sleep 2
-        exit 1
-    fi
-}
-
-# Function to check system architecture.
-arch_check() {
-    if [ "$(dpkg --print-architecture)" != "amd64" ]; then
-        echo -e "\n ${CROSS} This script will only work on amd64! \n"
-        echo -e "Exiting..."
-        sleep 2
-        exit 1
-    fi
-}
-
 # Utility function to detect package manager and set commands.
 detect_package_manager() {
     if command -v apt-get &>/dev/null; then
@@ -142,8 +110,6 @@ color
 catch_errors
 
 # Check system requirements
-#shell_check
-#arch_check
 root_check
 detect_package_manager
 
@@ -259,11 +225,14 @@ run_actions() {
     esac
 }
 
+# Debug: check if "Run All Actions" is selected
 if [[ " ${choices[@]} " =~ " 9 " ]]; then
+    echo "Running all actions" # Debug statement
     for i in {1..8}; do
         run_actions $i
     done
 else
+    echo "Running selected actions" # Debug statement
     for choice in ${choices[@]}; do
         run_actions $choice
     done
