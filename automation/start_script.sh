@@ -202,29 +202,39 @@ options=(
 choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
 clear
 
+# Debug: print selected choices
+echo "Selected choices: ${choices[@]}"
+
 # Function to run actions
 run_actions() {
     local choice=$1
+    echo "Running action for choice: $choice" # Debug statement
     case $choice in
     1 | 9)
+        echo "Sourcing add_aliases" # Debug statement
         source_script "$GITHUB_REPO_URL/add_aliases.func" && add_aliases
         ;;
     2 | 9)
+        echo "Sourcing update_upgrade and install_packages" # Debug statement
         source_script "$GITHUB_REPO_URL/update_upgrade.func" && update_upgrade
-        source_script "$GITHUB_REPO_URL/install_packages.func" && install_packages_dialog
+        source_script "$GITHUB_REPO_URL/install_packages.func" && install_packages
         ;;
     3 | 9)
+        echo "Sourcing create_user_james and optimise_ssh" # Debug statement
         source_script "$GITHUB_REPO_URL/create_user_james.func" && create_user_james
         source_script "$GITHUB_REPO_URL/optimise_ssh.func" && optimise_ssh
         ;;
     4 | 9)
+        echo "Sourcing configure_ufw and configure_fail2ban" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_ufw.func" && configure_ufw
         source_script "$GITHUB_REPO_URL/configure_fail2ban.func" && configure_fail2ban
         ;;
     5 | 9)
+        echo "Sourcing configure_nfs" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_nfs.func" && add_nfs_entries
         ;;
     6 | 9)
+        echo "Sourcing DNS and Network Configuration scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func" && install_dnscrypt_proxy
         source_script "$GITHUB_REPO_URL/configure_dnscrypt_proxy.func" && configure_dnscrypt_proxy
         source_script "$GITHUB_REPO_URL/set_custom_dns.func" && set_custom_dns
@@ -232,16 +242,18 @@ run_actions() {
         source_script "$GITHUB_REPO_URL/create_dns_cron_job.func" && create_dns_cron_job
         ;;
     7 | 9)
+        echo "Sourcing auto updates and daily package updates scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_auto_updates.func" && configure_auto_updates
         source_script "$GITHUB_REPO_URL/create_daily_update_script.func" && create_daily_update_script
         ;;
     8 | 9)
+        echo "Sourcing VPN and Log Rotation scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/create_vpn_check_script.func" && create_vpn_check_script
         source_script "$GITHUB_REPO_URL/create_vpn_check_service.func" && create_vpn_check_service
         source_script "$GITHUB_REPO_URL/configure_log_rotation.func" && configure_log_rotation
         ;;
     *)
-        echo "Invalid choice. Exiting."
+        echo "Invalid choice. Exiting." # Debug statement
         exit 1
         ;;
     esac
