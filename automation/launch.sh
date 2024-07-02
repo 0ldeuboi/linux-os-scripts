@@ -33,6 +33,14 @@ error_handler() {
     exit_script
 }
 
+# Function to check if the script is running as root.
+root_check() {
+    if [[ "$EUID" -ne 0 ]]; then
+        msg_error "This script must be run as root. Please run again with sudo or as root."
+        exit 1
+    fi
+}
+
 # Function to display a spinner.
 spinner() {
     local chars="/-\|"
