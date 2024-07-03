@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Function to set color variables using ANSI escape codes for formatting text in the terminal.
 color() {
