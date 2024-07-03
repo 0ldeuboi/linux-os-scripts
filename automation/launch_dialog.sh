@@ -173,6 +173,7 @@ options=(
     9 "Run All Actions" off
 )
 
+# Capture the selections from the user
 choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
 clear
 
