@@ -175,10 +175,17 @@ options=(
 
 # Capture the selections from the user
 choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
+exit_code=$?
 clear
 
-# Debug: print selected choices
+# Debug: print the dialog exit code and selected choices
+echo "Dialog exit code: $exit_code"
 echo "Selected choices: ${choices[@]}"
+
+# Check if the user canceled the dialog
+if [[ $exit_code -ne 0 ]]; then
+    exit_script
+fi
 
 # Function to run actions
 run_actions() {
