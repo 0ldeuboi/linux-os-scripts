@@ -17,6 +17,7 @@ HOLD=" "
 catch_errors() {
     set -Eeuo pipefail
     trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
+    trap exit_script SIGINT
 }
 
 # Function called when an error occurs.
@@ -58,24 +59,33 @@ msg_info() {
     SPINNER_PID=$!
 }
 
+# Function to stop the spinner.
+stop_spinner() {
+    if [ -n "${SPINNER_PID-}" ] && ps -p $SPINNER_PID >/dev/null; then
+        kill $SPINNER_PID >/dev/null 2>&1
+        wait $SPINNER_PID 2>/dev/null
+        unset SPINNER_PID
+    fi
+    printf "\e[?25h"
+}
+
 # Function to display a success message with a green color.
 msg_ok() {
-    if [ -n "${SPINNER_PID-}" ] && ps -p $SPINNER_PID >/dev/null; then kill $SPINNER_PID >/dev/null; fi
-    printf "\e[?25h"
+    stop_spinner
     local msg="$1"
     echo -e "${BFR} ${CHECK} ${GREEN}${msg}${NC}"
 }
 
 # Function to display an error message with a red color.
 msg_error() {
-    if [ -n "${SPINNER_PID-}" ] && ps -p $SPINNER_PID >/dev/null; then kill $SPINNER_PID >/dev/null; fi
-    printf "\e[?25h"
+    stop_spinner
     local msg="$1"
     echo -e "${BFR} ${CROSS} ${RED}${msg}${NC}"
 }
 
 # This function is called when the user decides to exit the script.
 exit_script() {
+    stop_spinner
     clear
     echo -e "⚠  User exited script \n"
     exit
