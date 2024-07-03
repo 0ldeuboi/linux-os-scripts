@@ -4,6 +4,7 @@ add_aliases() {
 
     print_colored $BLUE "Adding system-wide aliases..."
 
+    # Ensure aliases are added to the system-wide profile
     if ! grep -q "alias ll='ls -la'" "$aliases_file"; then
         echo "alias ll='ls -la'" >> "$aliases_file"
     fi
@@ -16,23 +17,14 @@ add_aliases() {
         if ! grep -q "alias uur='apk update && apk upgrade'" "$aliases_file"; then
             echo "alias uur='apk update && apk upgrade'" >> "$aliases_file"
         fi
-
-        # If the system is Alpine Linux, ensure bash is installed
-        if ! command -v bash &>/dev/null; then
-            print_colored $BLUE "Installing bash on Alpine Linux..."
-            apk add bash
-        fi
-
-        print_colored $BLUE "Ensuring ~/.bashrc sources /etc/profile.d/aliases.sh..."
-        if ! grep -q "source /etc/profile.d/aliases.sh" "$bashrc_file"; then
-            echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
-        fi
-
-        print_colored $BLUE "Switching to bash and sourcing .bashrc to apply aliases..."
-        /bin/bash -c "source $bashrc_file; exec /bin/bash"
     fi
 
-    # Source the aliases file immediately to apply changes in the current session
+    print_colored $BLUE "Ensuring ~/.bashrc sources /etc/profile.d/aliases.sh..."
+    if ! grep -q "source /etc/profile.d/aliases.sh" "$bashrc_file"; then
+        echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
+    fi
+
+    # Source the bashrc file immediately to apply changes in the current session
     source "$bashrc_file"
 
     print_colored $GREEN "System-wide aliases added."

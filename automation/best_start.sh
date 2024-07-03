@@ -147,6 +147,18 @@ handle_error() {
     esac
 }
 
+# Ensure that the script is running in Bash if the system is Alpine Linux
+if command -v apk &>/dev/null; then
+    if ! command -v bash &>/dev/null; then
+        msg_info "Installing bash on Alpine Linux..."
+        apk add bash
+        msg_ok "Bash installed successfully."
+    fi
+    msg_info "Switching to bash and sourcing .bashrc..."
+    echo "source /etc/profile.d/aliases.sh" >>"$HOME/.bashrc"
+    exec /bin/bash -c "source $HOME/.bashrc; exec /bin/bash"
+fi
+
 # Install dialog if not installed
 install_package "dialog"
 
@@ -158,7 +170,6 @@ source_script() {
     if [ $? -ne 0 ]; then
         handle_error "Failed to download $script_url"
     fi
-    cat /tmp/temp_script.sh # Debug: display the content of the downloaded script
     source /tmp/temp_script.sh || handle_error "Failed to source $script_url"
     rm -f /tmp/temp_script.sh
 }
@@ -190,38 +201,38 @@ run_actions() {
     echo "Running action for choice: $choice" # Debug statement
     case $choice in
     1 | 9)
-        echo "Sourcing func_add_aliases" # Debug statement
-        source_script "$GITHUB_REPO_URL/configure_aliases.func"
+        echo "Sourcing and running add_aliases" # Debug statement
+        source_script "$GITHUB_REPO_URL/add_aliases.func"
         add_aliases
         ;;
     2 | 9)
-        echo "Sourcing update_upgrade and install_packages" # Debug statement
+        echo "Sourcing and running update_upgrade and install_packages" # Debug statement
         source_script "$GITHUB_REPO_URL/update_upgrade.func"
         update_upgrade
         source_script "$GITHUB_REPO_URL/install_packages.func"
         install_packages
         ;;
     3 | 9)
-        echo "Sourcing create_user_james and optimise_ssh" # Debug statement
+        echo "Sourcing and running create_user_james and optimise_ssh" # Debug statement
         source_script "$GITHUB_REPO_URL/create_user_james.func"
         create_user_james
         source_script "$GITHUB_REPO_URL/optimise_ssh.func"
         optimise_ssh
         ;;
     4 | 9)
-        echo "Sourcing configure_ufw and configure_fail2ban" # Debug statement
+        echo "Sourcing and running configure_ufw and configure_fail2ban" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_ufw.func"
         configure_ufw
         source_script "$GITHUB_REPO_URL/configure_fail2ban.func"
         configure_fail2ban
         ;;
     5 | 9)
-        echo "Sourcing configure_nfs" # Debug statement
+        echo "Sourcing and running configure_nfs" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_nfs.func"
         add_nfs_entries
         ;;
     6 | 9)
-        echo "Sourcing DNS and Network Configuration scripts" # Debug statement
+        echo "Sourcing and running DNS and Network Configuration scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func"
         install_dnscrypt_proxy
         source_script "$GITHUB_REPO_URL/configure_dnscrypt_proxy.func"
@@ -234,14 +245,14 @@ run_actions() {
         create_dns_cron_job
         ;;
     7 | 9)
-        echo "Sourcing auto updates and daily package updates scripts" # Debug statement
+        echo "Sourcing and running auto updates and daily package updates scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_auto_updates.func"
         configure_auto_updates
         source_script "$GITHUB_REPO_URL/create_daily_update_script.func"
         create_daily_update_script
         ;;
     8 | 9)
-        echo "Sourcing VPN and Log Rotation scripts" # Debug statement
+        echo "Sourcing and running VPN and Log Rotation scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/create_vpn_check_script.func"
         create_vpn_check_script
         source_script "$GITHUB_REPO_URL/create_vpn_check_service.func"
@@ -256,18 +267,10 @@ run_actions() {
     esac
 }
 
-# Debug: check if "Run All Actions" is selected
-if [[ " ${choices[@]} " =~ " 9 " ]]; then
-    echo "Running all actions" # Debug statement
-    for i in {1..8}; do
-        run_actions $i
-    done
-else
-    echo "Running selected actions" # Debug statement
-    for choice in ${choices[@]}; do
-        run_actions $choice
-    done
-fi
+# Run selected actions sequentially
+for choice in ${choices[@]}; do
+    run_actions $choice
+done
 
 echo ""
 echo "Setup completed successfully. Install log can be found at $LOG_FILE"
