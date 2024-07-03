@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # ANSI color codes
 RED='\033[0;31m'
@@ -147,16 +147,24 @@ handle_error() {
     esac
 }
 
-# Ensure that the script is running in Bash if the system is Alpine Linux
-if command -v apk &>/dev/null; then
-    if ! command -v bash &>/dev/null; then
-        msg_info "Installing bash on Alpine Linux..."
-        apk add bash
-        msg_ok "Bash installed successfully."
+# Check if the script is already running in bash
+if [[ -z "$BASH_VERSION" ]]; then
+    if command -v apk &>/dev/null; then
+        # Install bash if not already installed on Alpine Linux
+        if ! command -v bash &>/dev/null; then
+            msg_info "Installing bash on Alpine Linux..."
+            apk add bash
+            msg_ok "Bash installed successfully."
+        fi
+
+        # Switch to bash and source .bashrc
+        msg_info "Switching to bash and sourcing .bashrc..."
+        echo "source /etc/profile.d/aliases.sh" >>"$HOME/.bashrc"
+        exec /bin/bash -c "source $HOME/.bashrc; exec /bin/bash"
+    else
+        msg_error "Bash is required to run this script. Please install bash and try again."
+        exit 1
     fi
-    msg_info "Switching to bash and sourcing .bashrc..."
-    echo "source /etc/profile.d/aliases.sh" >>"$HOME/.bashrc"
-    exec /bin/bash -c "source $HOME/.bashrc; exec /bin/bash"
 fi
 
 # Install dialog if not installed
@@ -202,7 +210,7 @@ run_actions() {
     case $choice in
     1 | 9)
         echo "Sourcing and running add_aliases" # Debug statement
-        source_script "$GITHUB_REPO_URL/add_aliases.func"
+        source_script "$GITHUB_REPO_URL/configure_aliases.func"
         add_aliases
         ;;
     2 | 9)
