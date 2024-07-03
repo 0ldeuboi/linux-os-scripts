@@ -1,19 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Function to set color variables using ANSI escape codes for formatting text in the terminal.
-color() {
-    YW="\033[33m"
-    BL="\033[36m"
-    RD="\033[01;31m"
-    BGN="\033[4;92m"
-    GN="\033[1;92m"
-    DGN="\033[32m"
-    CL="\033[m"
-    CM="${GN}✓${CL}"
-    CROSS="${RD}✗${CL}"
-    BFR="\\r\\033[K"
-    HOLD=" "
-}
+# ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+BOLD_GREEN='\033[1;92m'
+DARK_GREEN='\033[32m'
+CHECK="${GREEN}✓${NC}"
+CROSS="${RED}✗${NC}"
+BFR="\\r\\033[K"
+HOLD=" "
 
 # Function to enable error handling in the script by setting options and defining a trap for the ERR signal.
 catch_errors() {
@@ -28,7 +26,7 @@ error_handler() {
     local exit_code="$?"
     local line_number="$1"
     local command="$2"
-    local error_message="${RD}[ERROR]${CL} in line ${RD}$line_number${CL}: exit code ${RD}$exit_code${CL}: while executing command ${YW}$command${CL}"
+    local error_message="${RED}[ERROR]${NC} in line ${RED}$line_number${NC}: exit code ${RED}$exit_code${NC}: while executing command ${YELLOW}$command${NC}"
     echo -e "\n$error_message\n"
     exit_script
 }
@@ -55,7 +53,7 @@ spinner() {
 # Function to display an informational message with a yellow color.
 msg_info() {
     local msg="$1"
-    echo -ne " ${HOLD} ${YW}${msg}   "
+    echo -ne " ${HOLD} ${YELLOW}${msg}   "
     spinner &
     SPINNER_PID=$!
 }
@@ -65,7 +63,7 @@ msg_ok() {
     if [ -n "${SPINNER_PID-}" ] && ps -p $SPINNER_PID >/dev/null; then kill $SPINNER_PID >/dev/null; fi
     printf "\e[?25h"
     local msg="$1"
-    echo -e "${BFR} ${CM} ${GN}${msg}${CL}"
+    echo -e "${BFR} ${CHECK} ${GREEN}${msg}${NC}"
 }
 
 # Function to display an error message with a red color.
@@ -73,7 +71,7 @@ msg_error() {
     if [ -n "${SPINNER_PID-}" ] && ps -p $SPINNER_PID >/dev/null; then kill $SPINNER_PID >/dev/null; fi
     printf "\e[?25h"
     local msg="$1"
-    echo -e "${BFR} ${CROSS} ${RD}${msg}${CL}"
+    echo -e "${BFR} ${CROSS} ${RED}${msg}${NC}"
 }
 
 # This function is called when the user decides to exit the script.
@@ -113,8 +111,7 @@ install_package() {
     fi
 }
 
-# Initialize colors and error handling
-color
+# Initialize error handling
 catch_errors
 
 # Check system requirements
@@ -123,13 +120,13 @@ detect_package_manager
 
 # Define log file and other variables
 LOG_FILE="/var/log/setup_script.log"
-GITHUB_REPO_URL="https://raw.githubusercontent.com/0ldeuboi/linux-os-scripts/main/automation/"
+GITHUB_REPO_URL="https://raw.githubusercontent.com/0ldeuboi/linux-os-scripts/main/automation"
 
 # Function to print colored messages and log them
 print_colored() {
     local color=$1
     local message=$2
-    echo -e "${color}${message}${CL}"
+    echo -e "${color}${message}${NC}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ${message}" >>"$LOG_FILE"
 }
 
@@ -156,7 +153,14 @@ install_package "dialog"
 # Function to source scripts from GitHub when needed
 source_script() {
     local script_url="$1"
-    source <(curl -s -H "Authorization: token $GITHUB_TOKEN" "$script_url") || handle_error "Failed to source $script_url"
+    echo "Sourcing script from: $script_url" # Debug statement
+    curl -s "$script_url" -o /tmp/temp_script.sh
+    if [ $? -ne 0 ]; then
+        handle_error "Failed to download $script_url"
+    fi
+    cat /tmp/temp_script.sh # Debug: display the content of the downloaded script
+    source /tmp/temp_script.sh || handle_error "Failed to source $script_url"
+    rm -f /tmp/temp_script.sh
 }
 
 # Define the options for the checklist
@@ -175,17 +179,10 @@ options=(
 
 # Capture the selections from the user
 choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
-exit_code=$?
 clear
 
-# Debug: print the dialog exit code and selected choices
-echo "Dialog exit code: $exit_code"
+# Debug: print selected choices
 echo "Selected choices: ${choices[@]}"
-
-# Check if the user canceled the dialog
-if [[ $exit_code -ne 0 ]]; then
-    exit_script
-fi
 
 # Function to run actions
 run_actions() {
@@ -194,45 +191,63 @@ run_actions() {
     case $choice in
     1 | 9)
         echo "Sourcing add_aliases" # Debug statement
-        source_script "$GITHUB_REPO_URL/add_aliases.func" && add_aliases
+        source_script "$GITHUB_REPO_URL/add_aliases.func"
+        add_aliases
         ;;
     2 | 9)
         echo "Sourcing update_upgrade and install_packages" # Debug statement
-        source_script "$GITHUB_REPO_URL/update_upgrade.func" && update_upgrade
-        source_script "$GITHUB_REPO_URL/install_packages.func" && install_packages
+        source_script "$GITHUB_REPO_URL/update_upgrade.func"
+        update_upgrade
+        source_script "$GITHUB_REPO_URL/install_packages.func"
+        install_packages
         ;;
     3 | 9)
         echo "Sourcing create_user_james and optimise_ssh" # Debug statement
-        source_script "$GITHUB_REPO_URL/create_user_james.func" && create_user_james
-        source_script "$GITHUB_REPO_URL/optimise_ssh.func" && optimise_ssh
+        source_script "$GITHUB_REPO_URL/create_user_james.func"
+        create_user_james
+        source_script "$GITHUB_REPO_URL/optimise_ssh.func"
+        optimise_ssh
         ;;
     4 | 9)
         echo "Sourcing configure_ufw and configure_fail2ban" # Debug statement
-        source_script "$GITHUB_REPO_URL/configure_ufw.func" && configure_ufw
-        source_script "$GITHUB_REPO_URL/configure_fail2ban.func" && configure_fail2ban
+        source_script "$GITHUB_REPO_URL/configure_ufw.func"
+        configure_ufw
+        source_script "$GITHUB_REPO_URL/configure_fail2ban.func"
+        configure_fail2ban
         ;;
     5 | 9)
         echo "Sourcing configure_nfs" # Debug statement
-        source_script "$GITHUB_REPO_URL/configure_nfs.func" && add_nfs_entries
+        source_script "$GITHUB_REPO_URL/configure_nfs.func"
+        add_nfs_entries
         ;;
     6 | 9)
         echo "Sourcing DNS and Network Configuration scripts" # Debug statement
-        source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func" && install_dnscrypt_proxy
-        source_script "$GITHUB_REPO_URL/configure_dnscrypt_proxy.func" && configure_dnscrypt_proxy
-        source_script "$GITHUB_REPO_URL/set_custom_dns.func" && set_custom_dns
-        source_script "$GITHUB_REPO_URL/create_dns_setup_script.func" && create_dns_setup_script
-        source_script "$GITHUB_REPO_URL/create_dns_cron_job.func" && create_dns_cron_job
+        source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func"
+        install_dnscrypt_proxy
+        source_script "$GITHUB_REPO_URL/configure_dnscrypt_proxy.func"
+        configure_dnscrypt_proxy
+        source_script "$GITHUB_REPO_URL/set_custom_dns.func"
+        set_custom_dns
+        source_script "$GITHUB_REPO_URL/create_dns_setup_script.func"
+        create_dns_setup_script
+        source_script "$GITHUB_REPO_URL/create_dns_cron_job.func"
+        create_dns_cron_job
         ;;
     7 | 9)
         echo "Sourcing auto updates and daily package updates scripts" # Debug statement
-        source_script "$GITHUB_REPO_URL/configure_auto_updates.func" && configure_auto_updates
-        source_script "$GITHUB_REPO_URL/create_daily_update_script.func" && create_daily_update_script
+        source_script "$GITHUB_REPO_URL/configure_auto_updates.func"
+        configure_auto_updates
+        source_script "$GITHUB_REPO_URL/create_daily_update_script.func"
+        create_daily_update_script
         ;;
     8 | 9)
         echo "Sourcing VPN and Log Rotation scripts" # Debug statement
-        source_script "$GITHUB_REPO_URL/create_vpn_check_script.func" && create_vpn_check_script
-        source_script "$GITHUB_REPO_URL/create_vpn_check_service.func" && create_vpn_check_service
-        source_script "$GITHUB_REPO_URL/configure_log_rotation.func" && configure_log_rotation
+        source_script "$GITHUB_REPO_URL/create_vpn_check_script.func"
+        create_vpn_check_script
+        source_script "$GITHUB_REPO_URL/create_vpn_check_service.func"
+        create_vpn_check_service
+        source_script "$GITHUB_REPO_URL/configure_log_rotation.func"
+        configure_log_rotation
         ;;
     *)
         echo "Invalid choice. Exiting." # Debug statement
