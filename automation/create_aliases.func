@@ -23,7 +23,8 @@ add_aliases() {
         echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
     fi
 
-    source "$local bashrc_file"
+    # Source the bashrc file immediately to apply changes
+    source "$bashrc_file"
 
     print_colored $GREEN "System-wide aliases added."
 }
