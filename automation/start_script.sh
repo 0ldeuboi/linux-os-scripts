@@ -190,8 +190,8 @@ run_actions() {
     echo "Running action for choice: $choice" # Debug statement
     case $choice in
     1 | 9)
-        echo "Sourcing add_aliases" # Debug statement
-        source_script "$GITHUB_REPO_URL/add_aliases.func"
+        echo "Sourcing func_add_aliases" # Debug statement
+        source_script "$GITHUB_REPO_URL/func_add_aliases.func"
         add_aliases
         ;;
     2 | 9)
