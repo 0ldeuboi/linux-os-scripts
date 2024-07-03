@@ -191,7 +191,7 @@ run_actions() {
     case $choice in
     1 | 9)
         echo "Sourcing func_add_aliases" # Debug statement
-        source_script "$GITHUB_REPO_URL/create__configure_aliases.func"
+        source_script "$GITHUB_REPO_URL/configure_aliases.func"
         add_aliases
         ;;
     2 | 9)

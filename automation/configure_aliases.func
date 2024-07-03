@@ -23,15 +23,17 @@ add_aliases() {
             apk add bash
         fi
 
-        print_colored $BLUE "Switching to bash and sourcing .bashrc to apply aliases..."
-        echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
+        print_colored $BLUE "Ensuring ~/.bashrc sources /etc/profile.d/aliases.sh..."
+        if ! grep -q "source /etc/profile.d/aliases.sh" "$bashrc_file"; then
+            echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
+        fi
 
-        # Switch to bash without terminating the session
-        /bin/bash -c "source $bashrc_file"
-    else
-        # Source the aliases file immediately to apply changes
-        source "$bashrc_file"
+        print_colored $BLUE "Switching to bash and sourcing .bashrc to apply aliases..."
+        /bin/bash -c "source $bashrc_file; exec /bin/bash"
     fi
+
+    # Source the aliases file immediately to apply changes in the current session
+    source "$bashrc_file"
 
     print_colored $GREEN "System-wide aliases added."
 }
