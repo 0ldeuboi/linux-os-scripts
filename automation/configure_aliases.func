@@ -17,15 +17,25 @@ add_aliases() {
         if ! grep -q "alias uur='apk update && apk upgrade'" "$aliases_file"; then
             echo "alias uur='apk update && apk upgrade'" >> "$aliases_file"
         fi
-    fi
 
-    print_colored $BLUE "Ensuring ~/.bashrc sources /etc/profile.d/aliases.sh..."
-    if ! grep -q "source /etc/profile.d/aliases.sh" "$bashrc_file"; then
-        echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
-    fi
+        # Ensure bash is installed and switch to bash
+        if ! command -v bash &>/dev/null; then
+            print_colored $BLUE "Installing bash on Alpine Linux..."
+            apk add bash
+        fi
 
-    # Source the bashrc file immediately to apply changes in the current session
-    source "$bashrc_file"
+        print_colored $BLUE "Ensuring ~/.bashrc sources /etc/profile.d/aliases.sh..."
+        if ! grep -q "source /etc/profile.d/aliases.sh" "$bashrc_file"; then
+            echo "source /etc/profile.d/aliases.sh" >> "$bashrc_file"
+        fi
+
+        print_colored $BLUE "Sourcing .bashrc to apply aliases..."
+        # Switch to bash and source .bashrc within the current session
+        /bin/bash -c "source $bashrc_file"
+    else
+        # Source the aliases file immediately to apply changes in the current session
+        source "$aliases_file"
+    fi
 
     print_colored $GREEN "System-wide aliases added."
 }
