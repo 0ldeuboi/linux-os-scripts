@@ -1,0 +1,15 @@
+configure_fail2ban() {
+    detect_package_manager
+    install_package "fail2ban"
+
+    print_colored $BLUE "Configuring Fail2Ban..."
+    if ! systemctl enable fail2ban; then
+        handle_error "Failed to enable Fail2Ban"
+    fi
+
+    if ! systemctl start fail2ban; then
+        handle_error "Failed to start Fail2Ban"
+    fi
+
+    print_colored $GREEN "Fail2Ban configuration completed."
+}

@@ -1,0 +1,20 @@
+create_vpn_check_service() {
+    print_colored $BLUE "Creating systemd service..."
+    cat <<EOF > /etc/systemd/system/vpn_check.service
+[Unit]
+Description=VPN Connection Check and Restart Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/vpn_check.sh
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable vpn_check.service || handle_error "Failed to enable vpn_check.service."
+    systemctl start vpn_check.service || handle_error "Failed to start vpn_check.service."
+    print_colored $GREEN "Systemd service for VPN check creation completed."
+}

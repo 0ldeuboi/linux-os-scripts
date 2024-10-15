@@ -1,0 +1,15 @@
+configure_ufw() {
+    detect_package_manager
+    install_package "ufw"
+
+    print_colored $BLUE "Configuring UFW (Uncomplicated Firewall)..."
+    if ! ufw allow OpenSSH; then
+        handle_error "Failed to allow OpenSSH in UFW"
+    fi
+
+    if ! ufw enable; then
+        handle_error "Failed to enable UFW"
+    fi
+
+    print_colored $GREEN "UFW configuration completed."
+}

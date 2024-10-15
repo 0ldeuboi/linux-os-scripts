@@ -1,0 +1,7 @@
+create_dns_cron_job() {
+    print_colored $BLUE "Creating cron job to run DNS setup script at reboot..."
+
+    echo "@reboot root /usr/local/bin/set_dns.sh" > /etc/cron.d/set_dns || handle_error "Failed to create cron job."
+
+    print_colored $GREEN "Cron job for DNS setup script creation completed."
+}

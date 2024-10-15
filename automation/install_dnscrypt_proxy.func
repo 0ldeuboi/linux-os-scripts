@@ -1,0 +1,8 @@
+install_dnscrypt_proxy() {
+    print_colored $BLUE "Installing dnscrypt-proxy..."
+
+    detect_package_manager
+    install_package "dnscrypt-proxy"
+
+    print_colored $GREEN "dnscrypt-proxy installation completed."
+}

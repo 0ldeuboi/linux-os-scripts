@@ -1,0 +1,18 @@
+configure_log_rotation() {
+    print_colored $BLUE "Configuring log rotation..."
+    cat <<EOF > /etc/logrotate.d/vpn_check
+/var/log/vpn_check.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    postrotate
+        systemctl restart vpn_check.service > /dev/null 2>&1 || true
+    endscript
+}
+EOF
+    print_colored $GREEN "Log rotation configuration for VPN check completed."
+}

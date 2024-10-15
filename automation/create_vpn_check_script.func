@@ -1,0 +1,72 @@
+create_vpn_check_script() {
+    VPN_COUNTRY=${VPN_COUNTRY:-}
+    OPENVPN_SERVICE=${OPENVPN_SERVICE:-}
+
+    if [ -z "$VPN_COUNTRY" ]; then
+        read -p "Enter VPN country code (e.g., US): " VPN_COUNTRY
+    fi
+    if [ -z "$OPENVPN_SERVICE" ]; then
+        read -p "Enter OpenVPN service name: " OPENVPN_SERVICE
+    fi
+
+    print_colored $BLUE "Creating VPN check script..."
+    cat <<EOF > /usr/local/bin/vpn_check.sh
+#!/bin/bash
+
+CONFIG_FILE="/etc/vpn_check.conf"
+LOG_FILE="/var/log/vpn_check.log"
+
+if [ -f "\$CONFIG_FILE" ]; then
+    source "\$CONFIG_FILE"
+else
+    echo "\$(date): Configuration file not found: \$CONFIG_FILE" | tee -a \$LOG_FILE
+    exit 1
+fi
+
+check_vpn_connection() {
+    if ping -c 1 8.8.8.8 &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+restart_openvpn() {
+    echo "\$(date): VPN connection is down. Restarting OpenVPN service..." | tee -a \$LOG_FILE
+    sudo systemctl restart \$OPENVPN_SERVICE
+    if [ \$? -eq 0 ]; then
+        echo "\$(date): OpenVPN service restarted successfully." | tee -a \$LOG_FILE
+    else
+        echo "\$(date): Failed to restart OpenVPN service." | tee -a \$LOG_FILE
+    fi
+}
+
+check_vpn_country() {
+    CURRENT_COUNTRY=\$(curl -s https://ipinfo.io/country)
+    
+    if [ "\$CURRENT_COUNTRY" == "\$VPN_COUNTRY" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+while true; do
+    if check_vpn_connection && check_vpn_country; then
+        echo "\$(date): VPN connection is active and country is correct (\$VPN_COUNTRY)." | tee -a \$LOG_FILE
+    else
+        restart_openvpn
+    fi
+    sleep 1h
+done
+EOF
+
+    chmod +x /usr/local/bin/vpn_check.sh || handle_error "Failed to create VPN check script."
+
+    print_colored $BLUE "Creating VPN check configuration..."
+    cat <<EOF > /etc/vpn_check.conf
+OPENVPN_SERVICE="$OPENVPN_SERVICE"
+VPN_COUNTRY="$VPN_COUNTRY"
+EOF
+    print_colored $GREEN "VPN check script and configuration creation completed."
+}

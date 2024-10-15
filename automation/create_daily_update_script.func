@@ -1,0 +1,61 @@
+create_daily_update_script() {
+    print_colored $BLUE "Creating daily package update script..."
+    cat << 'EOF' > /etc/cron.daily/update_packages.sh
+#!/bin/sh
+
+LOG_FILE="/var/log/update_packages.log"
+
+echo "****************$(date '+%Y-%m-%d %H:%M:%S')****************" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+
+log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+log_separator() {
+  echo "" >> "$LOG_FILE"
+  echo "*******************" >> "$LOG_FILE"
+  echo "" >> "$LOG_FILE"
+}
+
+log "Starting package update"
+log_separator
+
+log "Updating package repositories..."
+if ! $UPDATE_CMD >> "$LOG_FILE" 2>&1; then
+  log "Error updating package repositories. Check $LOG_FILE for details."
+  log_separator
+  exit 1
+fi
+log_separator
+
+log "Upgrading installed packages..."
+if ! $PACKAGE_MANAGER upgrade -y >> "$LOG_FILE" 2>&1; then
+  log "Error upgrading installed packages. Check $LOG_FILE for details."
+  log_separator
+  exit 1
+fi
+
+log_separator
+log "Package update completed"
+echo "" >> "$LOG_FILE"
+EOF
+    chmod +x /etc/cron.daily/update_packages.sh
+
+    print_colored $BLUE "Configuring log rotation for update_packages.log..."
+    cat <<EOF > /etc/logrotate.d/update_packages
+/var/log/update_packages.log {
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    postrotate
+        /bin/systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+EOF
+    print_colored $GREEN "Daily package update script creation and log rotation configuration completed."
+}

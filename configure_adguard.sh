@@ -3,13 +3,14 @@
 # Variables
 SERVER_IP="192.168.1.183"
 REVERSE_PROXY_IP="192.168.1.190"
-CLOUDFLARE_TUNNEL_IP="192.168.1.252"
+CLOUDFLARE_TUNNEL_IP="192.168.1.249"
 WIFI_AP_IP="192.168.1.3"
 ADGUARD_CONFIG="/opt/AdGuardHome/AdGuardHome.yaml"
 CLOUDFLARE_IPS_V4_URL="https://www.cloudflare.com/ips-v4"
 CLOUDFLARE_IPS_V6_URL="https://www.cloudflare.com/ips-v6"
 TEMP_DNS_SERVER="1.1.1.1"
-BACKUP_RESOLV_CONF="/etc/resolv.conf.bak"
+DOMAIN="adguard.myhomenet.casa"
+SPECIFIC_IPS=("89.37.94.113" "90.251.254.22")
 
 TUNNEL_IPS_V4=("198.41.192.167" "198.41.192.67" "198.41.192.57" "198.41.192.107" "198.41.192.27" "198.41.192.7" "198.41.192.227" "198.41.192.47" "198.41.192.37" "198.41.192.77" "198.41.200.13" "198.41.200.193" "198.41.200.3" "198.41.200.233" "198.41.200.53" "198.41.200.63" "198.41.200.113" "198.41.200.73" "198.41.200.43" "198.41.200.23")
 TUNNEL_IPS_V6=("2606:4700:a0::1" "2606:4700:a0::2" "2606:4700:a0::3" "2606:4700:a0::4" "2606:4700:a0::5" "2606:4700:a0::6" "2606:4700:a0::7" "2606:4700:a0::8" "2606:4700:a0::9" "2606:4700:a0::10" "2606:4700:a8::1" "2606:4700:a8::2" "2606:4700:a8::3" "2606:4700:a8::4" "2606:4700:a8::5" "2606:4700:a8::6" "2606:4700:a8::7" "2606:4700:a8::8" "2606:4700:a8::9" "2606:4700:a8::10")
@@ -48,7 +49,7 @@ allow_dns_traffic() {
 # Function to set temporary DNS server
 set_temporary_dns() {
     log "Setting temporary DNS server to $TEMP_DNS_SERVER..."
-    echo "nameserver $TEMP_DNS_SERVER" > /etc/resolv.conf
+    echo "nameserver $TEMP_DNS_SERVER" >/etc/resolv.conf
     log "Temporary DNS server set."
 }
 
@@ -90,7 +91,7 @@ update_adguard_config() {
             if [[ ! $line =~ $SERVER_IP ]] && [[ ! $line =~ 127.0.0.1 ]]; then
                 new_bind_hosts+="\n    $line"
             fi
-        done <<< "$existing_bind_hosts"
+        done <<<"$existing_bind_hosts"
     fi
 
     # Remove the existing bind_hosts section
@@ -116,13 +117,6 @@ restart_adguard() {
     fi
 }
 
-# Function to add iptables rules
-add_iptables_rule() {
-    local chain=$1
-    local rule=$2
-    rule_exists $chain $rule || iptables -A $chain $rule
-}
-
 # Function to configure iptables
 configure_iptables() {
     log "Configuring iptables..."
@@ -135,8 +129,15 @@ configure_iptables() {
         add_iptables_rule INPUT "-p tcp --dport 80 -s $range -j ACCEPT"
     done
 
-    add_iptables_rule INPUT "-s $WIFI_AP_IP -j ACCEPT"
-    add_iptables_rule OUTPUT "-d $WIFI_AP_IP -j ACCEPT"
+    # Allow DNS traffic from specific IP addresses
+    for ip in "${SPECIFIC_IPS[@]}"; do
+        rule_exists INPUT -p udp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p udp --dport 53 -s $ip -j ACCEPT
+        rule_exists INPUT -p tcp --dport 53 -s $ip -j ACCEPT || iptables -A INPUT -p tcp -s $ip --dport 53 -j ACCEPT
+    done
+
+    # Allow traffic to and from the Wi-Fi access point
+    rule_exists INPUT -s $WIFI_AP_IP -j ACCEPT || iptables -A INPUT -s $WIFI_AP_IP -j ACCEPT
+    rule_exists OUTPUT -d $WIFI_AP_IP -j ACCEPT || iptables -A OUTPUT -d $WIFI_AP_IP -j ACCEPT
 
     add_iptables_rule INPUT "-p udp --dport 53 -s 0.0.0.0/0 -j DROP"
     add_iptables_rule INPUT "-p tcp --dport 53 -s 0.0.0.0/0 -j DROP"
@@ -163,6 +164,11 @@ configure_ufw() {
         add_ufw_rule "allow from $range"
     done
 
+    # Allow DNS traffic from specific IP addresses
+    for ip in "${SPECIFIC_IPS[@]}"; do
+        ufw status | grep -q "ALLOW IN $ip to any port 53" || ufw allow from $ip to any port 53
+    done
+
     add_ufw_rule "allow from $WIFI_AP_IP"
     add_ufw_rule "allow to $WIFI_AP_IP"
     add_ufw_rule "deny 53"
@@ -174,11 +180,11 @@ configure_ufw() {
 
     while read -r cfip; do
         add_ufw_rule "allow proto tcp from $cfip to any port 443"
-    done < /tmp/ips-v4
+    done </tmp/ips-v4
 
     while read -r cfip; do
         add_ufw_rule "allow proto tcp from $cfip to any port 443"
-    done < /tmp/ips-v6
+    done </tmp/ips-v6
 
     add_ufw_rule "allow proto tcp from $REVERSE_PROXY_IP to any port 443"
 
@@ -207,6 +213,11 @@ configure_ufw() {
         add_ufw_rule "allow proto tcp from $ip to any port 443"
     done
 
+    # Allow HTTPS traffic from specific IP addresses and resolved domain IPs
+    for ip in "${SPECIFIC_IPS[@]}" $DOMAIN_IPS; do
+        ufw status | grep -q "ALLOW IN $ip to any port 443" || ufw allow proto tcp from $ip to any port 443
+    done
+
     execute_command "ufw reload"
     execute_command "ufw enable"
     log "ufw configured and enabled."
@@ -228,9 +239,11 @@ main() {
     allow_dns_traffic
     install_packages
     reapply_dns_restrictions
+    resolve_domain_ips
+    configure_iptables
+    configure_ufw
     update_adguard_config
     restart_adguard
-    configure_ufw
     restore_original_dns
     log "Configuration complete. Your AdGuard Home server should now only respond to DNS queries from local networks, allow SSH, and HTTPS traffic from Cloudflare IPs, your reverse proxy, and your Cloudflare Tunnel server. Cloudflare Tunnel configuration has also been applied."
 }
