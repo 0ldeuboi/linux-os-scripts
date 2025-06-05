@@ -149,10 +149,6 @@ handle_error() {
 
 # Install dialog if not installed
 install_package "dialog"
-# Add System-wide Aliases
-echo "Sourcing add_aliases" # Debug statement
-source_script "$GITHUB_REPO_URL/add_aliases.func"
-add_aliases
 
 # Function to source scripts from GitHub when needed
 source_script() {
@@ -170,14 +166,15 @@ source_script() {
 # Define the options for the checklist
 cmd=(dialog --separate-output --checklist "Select options:" 22 76 12)
 options=(
-    1 "Install Necessary Packages" off
-    2 "User and Security Configuration" off
-    3 "Configure UFW and Fail2Ban" off
-    4 "Configure NFS" off
-    5 "DNS and Network Configuration" off
-    6 "Create Automatic Security Updates & Daily Package Updates" off
-    7 "Configure VPN and Log Rotation" off
-    8 "Run All Actions" off
+    1 "Add System-wide Aliases" off
+    2 "Install Necessary Packages" off
+    3 "User and Security Configuration" off
+    4 "Configure UFW and Fail2Ban" off
+    5 "Configure NFS" off
+    6 "DNS and Network Configuration" off
+    7 "Create Automatic Security Updates & Daily Package Updates" off
+    8 "Configure VPN and Log Rotation" off
+    9 "Run All Actions" off
 )
 
 # Capture the selections from the user
@@ -192,33 +189,38 @@ run_actions() {
     local choice=$1
     echo "Running action for choice: $choice" # Debug statement
     case $choice in
-    1 | 8)
+    1 | 9)
+        echo "Sourcing add_aliases" # Debug statement
+        source_script "$GITHUB_REPO_URL/add_aliases.func"
+        add_aliases
+        ;;
+    2 | 9)
         echo "Sourcing update_upgrade and install_packages" # Debug statement
         source_script "$GITHUB_REPO_URL/update_upgrade.func"
         update_upgrade
         source_script "$GITHUB_REPO_URL/install_packages.func"
         install_packages
         ;;
-    2 | 8)
+    3 | 9)
         echo "Sourcing create_user_james and optimise_ssh" # Debug statement
         source_script "$GITHUB_REPO_URL/create_user_james.func"
         create_user_james
         source_script "$GITHUB_REPO_URL/optimise_ssh.func"
         optimise_ssh
         ;;
-    3 | 8)
+    4 | 9)
         echo "Sourcing configure_ufw and configure_fail2ban" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_ufw.func"
         configure_ufw
         source_script "$GITHUB_REPO_URL/configure_fail2ban.func"
         configure_fail2ban
         ;;
-    4 | 8)
+    5 | 9)
         echo "Sourcing configure_nfs" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_nfs.func"
         add_nfs_entries
         ;;
-    5 | 8)
+    6 | 9)
         echo "Sourcing DNS and Network Configuration scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/install_dnscrypt_proxy.func"
         install_dnscrypt_proxy
@@ -231,14 +233,14 @@ run_actions() {
         source_script "$GITHUB_REPO_URL/create_dns_cron_job.func"
         create_dns_cron_job
         ;;
-    6 | 8)
+    7 | 9)
         echo "Sourcing auto updates and daily package updates scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/configure_auto_updates.func"
         configure_auto_updates
         source_script "$GITHUB_REPO_URL/create_daily_update_script.func"
         create_daily_update_script
         ;;
-    7 | 8)
+    8 | 9)
         echo "Sourcing VPN and Log Rotation scripts" # Debug statement
         source_script "$GITHUB_REPO_URL/create_vpn_check_script.func"
         create_vpn_check_script
@@ -255,9 +257,9 @@ run_actions() {
 }
 
 # Debug: check if "Run All Actions" is selected
-if [[ " ${choices[@]} " =~ " 8 " ]]; then
+if [[ " ${choices[@]} " =~ " 9 " ]]; then
     echo "Running all actions" # Debug statement
-    for i in {1..7}; do
+    for i in {1..8}; do
         run_actions $i
     done
 else
