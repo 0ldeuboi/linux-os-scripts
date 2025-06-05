@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Variables
-# configure_adguard.sh
 SERVER_IP="192.168.1.183"
 REVERSE_PROXY_IP="192.168.1.190"
 CLOUDFLARE_TUNNEL_IP="192.168.1.249"
@@ -13,7 +12,6 @@ TEMP_DNS_SERVER="1.1.1.1"
 DOMAIN="adguard.myhomenet.casa"
 SPECIFIC_IPS=("89.37.94.113" "90.251.254.22")
 
-# Cloudflare Tunnel IPs and Domains
 TUNNEL_IPS_V4=("198.41.192.167" "198.41.192.67" "198.41.192.57" "198.41.192.107" "198.41.192.27" "198.41.192.7" "198.41.192.227" "198.41.192.47" "198.41.192.37" "198.41.192.77" "198.41.200.13" "198.41.200.193" "198.41.200.3" "198.41.200.233" "198.41.200.53" "198.41.200.63" "198.41.200.113" "198.41.200.73" "198.41.200.43" "198.41.200.23")
 TUNNEL_IPS_V6=("2606:4700:a0::1" "2606:4700:a0::2" "2606:4700:a0::3" "2606:4700:a0::4" "2606:4700:a0::5" "2606:4700:a0::6" "2606:4700:a0::7" "2606:4700:a0::8" "2606:4700:a0::9" "2606:4700:a0::10" "2606:4700:a8::1" "2606:4700:a8::2" "2606:4700:a8::3" "2606:4700:a8::4" "2606:4700:a8::5" "2606:4700:a8::6" "2606:4700:a8::7" "2606:4700:a8::8" "2606:4700:a8::9" "2606:4700:a8::10")
 OPTIONAL_IPS_V4=("104.19.192.29" "104.19.192.177" "104.19.192.175" "104.19.193.29" "104.19.192.174" "104.19.192.176" "104.18.25.129" "104.18.24.129" "104.19.194.29" "104.19.195.29" "104.18.4.64" "104.18.5.64")
@@ -51,16 +49,19 @@ allow_dns_traffic() {
 # Function to set temporary DNS server
 set_temporary_dns() {
     log "Setting temporary DNS server to $TEMP_DNS_SERVER..."
-    echo "nameserver $TEMP_DNS_SERVER" > /etc/resolv.conf
+    echo "nameserver $TEMP_DNS_SERVER" >/etc/resolv.conf
     log "Temporary DNS server set."
 }
 
 # Function to restore original DNS server
 restore_original_dns() {
     log "Restoring original DNS server..."
-    # Ensure to have a backup of the original /etc/resolv.conf before running the script
-    cp /etc/resolv.conf.bak /etc/resolv.conf
-    log "Original DNS server restored."
+    if [[ -f $BACKUP_RESOLV_CONF ]]; then
+        cp $BACKUP_RESOLV_CONF /etc/resolv.conf
+        log "Original DNS server restored."
+    else
+        log "Backup resolv.conf not found, please check manually."
+    fi
 }
 
 # Function to install necessary packages
@@ -78,19 +79,27 @@ update_adguard_config() {
     cp $ADGUARD_CONFIG $backup_file
     log "Backup of AdGuard Home configuration created at $backup_file"
 
-    # Ensure 192.168.1.183 is only entered once and 0.0.0.0 is removed
-    if grep -q "bind_hosts" $ADGUARD_CONFIG; then
-        sed -i "/bind_hosts/ {
-            :a
-            N
-            s/\n *- 0.0.0.0//g
-            s/\n *- $SERVER_IP//g
-            s/$/\n    - $SERVER_IP/
-            ba
-        }" $ADGUARD_CONFIG
-    else
-        sed -i "/dns:/a\  bind_hosts:\n    - $SERVER_IP" $ADGUARD_CONFIG
+    # Read the existing bind_hosts section, if any, excluding 0.0.0.0
+    existing_bind_hosts=$(sed -n '/bind_hosts:/,/[^ ]/p' $ADGUARD_CONFIG | grep -v "0.0.0.0" | grep -v "127.0.0.1" | grep -v "$SERVER_IP")
+
+    # Initialize the new bind_hosts list with the desired IPs
+    new_bind_hosts="- $SERVER_IP\n    - 127.0.0.1"
+
+    # Add the existing bind_hosts entries to the new list if they are not duplicates
+    if [ -n "$existing_bind_hosts" ]; then
+        while read -r line; do
+            if [[ ! $line =~ $SERVER_IP ]] && [[ ! $line =~ 127.0.0.1 ]]; then
+                new_bind_hosts+="\n    $line"
+            fi
+        done <<<"$existing_bind_hosts"
     fi
+
+    # Remove the existing bind_hosts section
+    sed -i '/bind_hosts:/,/[^ ]/d' $ADGUARD_CONFIG
+
+    # Add the new bind_hosts section
+    sed -i "/dns:/a\  bind_hosts:\n    $new_bind_hosts" $ADGUARD_CONFIG
+
     log "AdGuard Home configuration updated."
 }
 
@@ -108,24 +117,16 @@ restart_adguard() {
     fi
 }
 
-# Resolve the IP addresses of the domain
-resolve_domain_ips() {
-    DOMAIN_IPS=$(dig +short $DOMAIN | tr '\n' ' ')
-    if [[ -z "$DOMAIN_IPS" ]]; then
-        log "Could not resolve IPs for domain $DOMAIN"
-        exit 1
-    fi
-    log "Resolved IPs for $DOMAIN are $DOMAIN_IPS"
-}
-
 # Function to configure iptables
 configure_iptables() {
     log "Configuring iptables..."
 
-    # Allow DNS traffic from private IP address ranges
-    for range in "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"; do
-        rule_exists INPUT -p udp --dport 53 -s $range -j ACCEPT || iptables -A INPUT -p udp --dport 53 -s $range -j ACCEPT
-        rule_exists INPUT -p tcp --dport 53 -s $range -j ACCEPT || iptables -A INPUT -p tcp -s $range --dport 53 -j ACCEPT
+    local private_ranges=("10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16")
+
+    for range in "${private_ranges[@]}"; do
+        add_iptables_rule INPUT "-p udp --dport 53 -s $range -j ACCEPT"
+        add_iptables_rule INPUT "-p tcp --dport 53 -s $range -j ACCEPT"
+        add_iptables_rule INPUT "-p tcp --dport 80 -s $range -j ACCEPT"
     done
 
     # Allow DNS traffic from specific IP addresses
@@ -138,28 +139,29 @@ configure_iptables() {
     rule_exists INPUT -s $WIFI_AP_IP -j ACCEPT || iptables -A INPUT -s $WIFI_AP_IP -j ACCEPT
     rule_exists OUTPUT -d $WIFI_AP_IP -j ACCEPT || iptables -A OUTPUT -d $WIFI_AP_IP -j ACCEPT
 
-    # Allow HTTPS traffic from specific IP addresses and resolved domain IPs
-    for ip in "${SPECIFIC_IPS[@]}" $DOMAIN_IPS; do
-        rule_exists INPUT -p tcp --dport 443 -s $ip -j ACCEPT || iptables -A INPUT -p tcp --dport 443 -s $ip -j ACCEPT
-    done
+    add_iptables_rule INPUT "-p udp --dport 53 -s 0.0.0.0/0 -j DROP"
+    add_iptables_rule INPUT "-p tcp --dport 53 -s 0.0.0.0/0 -j DROP"
 
-    # Block all other DNS traffic
-    rule_exists INPUT -p udp --dport 53 -s 0.0.0.0/0 -j DROP || iptables -A INPUT -p udp --dport 53 -s 0.0.0.0/0 -j DROP
-    rule_exists INPUT -p tcp --dport 53 -s 0.0.0.0/0 -j DROP || iptables -A INPUT -p tcp --dport 53 -s 0.0.0.0/0 -j DROP
-
-    # Save iptables rules
     execute_command "netfilter-persistent save"
     log "iptables configured and rules saved."
+}
+
+# Function to add ufw rules
+add_ufw_rule() {
+    local rule=$1
+    ufw status | grep -q "$rule" || ufw $rule
 }
 
 # Function to configure ufw
 configure_ufw() {
     log "Configuring ufw..."
 
-    # Allow DNS traffic from private IP address ranges
-    for range in "10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16"; do
-        ufw status | grep -q "ALLOW IN $range to any port 53" || ufw allow from $range to any port 53
-        ufw status | grep -q "ALLOW IN $range" || ufw allow from $range
+    local private_ranges=("10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16")
+
+    for range in "${private_ranges[@]}"; do
+        add_ufw_rule "allow from $range to any port 53"
+        add_ufw_rule "allow from $range to any port 80"
+        add_ufw_rule "allow from $range"
     done
 
     # Allow DNS traffic from specific IP addresses
@@ -167,58 +169,48 @@ configure_ufw() {
         ufw status | grep -q "ALLOW IN $ip to any port 53" || ufw allow from $ip to any port 53
     done
 
-    # Allow traffic to and from the Wi-Fi access point
-    ufw status | grep -q "ALLOW IN $WIFI_AP_IP" || ufw allow from $WIFI_AP_IP
-    ufw status | grep -q "ALLOW OUT $WIFI_AP_IP" || ufw allow to $WIFI_AP_IP
+    add_ufw_rule "allow from $WIFI_AP_IP"
+    add_ufw_rule "allow to $WIFI_AP_IP"
+    add_ufw_rule "deny 53"
+    add_ufw_rule "allow ssh"
 
-    # Deny all other DNS traffic
-    ufw status | grep -q "DENY IN 53" || ufw deny 53
-
-    # Allow SSH connections
-    ufw status | grep -q "ALLOW IN ssh" || ufw allow ssh
-
-    # Allow HTTPS connections from Cloudflare IPs and reverse proxy
     log "Configuring Cloudflare IPs for HTTPS and reverse proxy..."
-    execute_command "wget $CLOUDFLARE_IPS_V4_URL -O ips-v4"
-    execute_command "wget $CLOUDFLARE_IPS_V6_URL -O ips-v6"
+    execute_command "wget $CLOUDFLARE_IPS_V4_URL -O /tmp/ips-v4"
+    execute_command "wget $CLOUDFLARE_IPS_V6_URL -O /tmp/ips-v6"
 
-    for cfip in $(cat ips-v4); do
-        ufw status | grep -q "ALLOW IN $cfip to any port 443" || ufw allow proto tcp from $cfip to any port 443
-    done
+    while read -r cfip; do
+        add_ufw_rule "allow proto tcp from $cfip to any port 443"
+    done </tmp/ips-v4
 
-    for cfip in $(cat ips-v6); do
-        ufw status | grep -q "ALLOW IN $cfip to any port 443" || ufw allow proto tcp from $cfip to any port 443
-    done
+    while read -r cfip; do
+        add_ufw_rule "allow proto tcp from $cfip to any port 443"
+    done </tmp/ips-v6
 
-    # Allow HTTPS connections from the reverse proxy
-    ufw status | grep -q "ALLOW IN $REVERSE_PROXY_IP to any port 443" || ufw allow proto tcp from $REVERSE_PROXY_IP to any port 443
+    add_ufw_rule "allow proto tcp from $REVERSE_PROXY_IP to any port 443"
 
-    # Allow connections from the Cloudflare Tunnel server
     for proto in "tcp" "udp"; do
-        ufw status | grep -q "ALLOW IN $CLOUDFLARE_TUNNEL_IP to any port 443" || ufw allow proto $proto from $CLOUDFLARE_TUNNEL_IP to any port 443
+        add_ufw_rule "allow proto $proto from $CLOUDFLARE_TUNNEL_IP to any port 443"
     done
 
-    # Allow Cloudflare Tunnel IPs
     log "Configuring Cloudflare Tunnel IPs..."
     for ip in "${TUNNEL_IPS_V4[@]}"; do
         for proto in "tcp" "udp"; do
-            ufw status | grep -q "ALLOW IN $ip to any port 7844" || ufw allow proto $proto from $ip to any port 7844
+            add_ufw_rule "allow proto $proto from $ip to any port 7844"
         done
     done
 
     for ip in "${TUNNEL_IPS_V6[@]}"; do
         for proto in "tcp" "udp"; do
-            ufw status | grep -q "ALLOW IN $ip to any port 7844" || ufw allow proto $proto from $ip to any port 7844
+            add_ufw_rule "allow proto $proto from $ip to any port 7844"
         done
     done
 
-    # Optional: Allow connections for software updates and other services
     for ip in "${OPTIONAL_IPS_V4[@]}"; do
-        ufw status | grep -q "ALLOW IN $ip to any port 443" || ufw allow proto tcp from $ip to any port 443
+        add_ufw_rule "allow proto tcp from $ip to any port 443"
     done
 
     for ip in "${OPTIONAL_IPS_V6[@]}"; do
-        ufw status | grep -q "ALLOW IN $ip to any port 443" || ufw allow proto tcp from $ip to any port 443
+        add_ufw_rule "allow proto tcp from $ip to any port 443"
     done
 
     # Allow HTTPS traffic from specific IP addresses and resolved domain IPs
@@ -242,7 +234,7 @@ reapply_dns_restrictions() {
 
 # Main script execution
 main() {
-    cp /etc/resolv.conf /etc/resolv.conf.bak
+    cp /etc/resolv.conf $BACKUP_RESOLV_CONF
     set_temporary_dns
     allow_dns_traffic
     install_packages
